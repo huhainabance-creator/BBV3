@@ -1,48 +1,57 @@
--- 1. Запуск самого Bitch Boy
+-- 1. Запуск зашифрованого скрипта
 loadstring(game:HttpGet("https://raw.githubusercontent.com/zakater5/LuaRepo/main/YBA/v3.lua"))()
 
--- 2. Чекаємо завантаження (збільшив час для надійності)
-task.wait(20)
+-- 2. Чекаємо початкове завантаження
+task.wait(15)
 
--- 3. Спроба активувати через прапорці (Flags)
-local function forceEnableFarm()
-    -- Перебираємо стандартні назви глобальних таблиць, які юзають топ-скрипти
-    local settings_tables = {_G.Settings, _G.Config, shared.Settings, shared.Config}
-    
-    for _, tbl in pairs(settings_tables) do
-        if tbl then
-            -- Пробуємо всі можливі назви для автофарму предметів
-            tbl["Item Auto Farm"] = true
-            tbl["ItemFarm"] = true
-            tbl["AutoFarmItems"] = true
-            tbl["Items"] = true
-            print("✅ Спроба активації через Settings таблицю")
-        end
-    end
+local VIM = game:GetService("VirtualInputManager")
+local player = game:GetService("Players").LocalPlayer
 
-    -- Спроба через бібліотеку прапорців (Rayfield/Lucid style)
-    if _G.Rayfield and _G.Rayfield.Flags then
-        for i, v in pairs(_G.Rayfield.Flags) do
-            if i:find("Item") or i:find("Farm") then
-                v:Set(true)
-                print("✅ Активовано через Rayfield Flag: " .. i)
-            end
-        end
-    end
+local function clickButton(v)
+    -- Отримуємо точні координати кнопки на твоєму екрані
+    local x = v.AbsolutePosition.X + (v.AbsoluteSize.X / 2)
+    local y = v.AbsolutePosition.Y + (v.AbsoluteSize.Y / 2) + 56 -- Додаємо офсет для TopBar мобілок/ПК
+
+    -- Імітуємо натискання (Down -> Wait -> Up)
+    VIM:SendMouseButtonEvent(x, y, 0, true, game, 1)
+    task.wait(0.1)
+    VIM:SendMouseButtonEvent(x, y, 0, false, game, 1)
+    print("🎯 Авто-тап по: " .. v.Text)
 end
 
--- Запускаємо активацію кілька разів
+-- 3. Цикл пошуку кнопки
 task.spawn(function()
-    for i = 1, 5 do
-        pcall(forceEnableFarm)
-        task.wait(3)
+    local activated = false
+    local attempts = 0
+    
+    while not activated and attempts < 30 do -- Шукаємо протягом 30 секунд
+        local coreGui = game:GetService("CoreGui")
+        
+        -- Перебираємо всі елементи інтерфейсу
+        for _, gui in pairs(coreGui:GetChildren()) do
+            if gui:IsA("ScreenGui") then
+                for _, v in pairs(gui:GetDescendants()) do
+                    -- Шукаємо саме ту кнопку, яку ти назвав
+                    if v:IsA("TextButton") and v.Text:find("Item Auto Farm") then
+                        -- Перевіряємо, чи кнопка видима (Visible)
+                        if v.Visible and v.AbsolutePosition.Y > 0 then
+                            clickButton(v)
+                            activated = true
+                            break
+                        end
+                    end
+                end
+            end
+        end
+        
+        if not activated then
+            attempts = attempts + 1
+            task.wait(2) -- Чекаємо 2 секунди перед наступною спробою
+        end
     end
 end)
 
--- 4. Анти-АФК
-local vu = game:GetService("VirtualUser")
-game:GetService("Players").LocalPlayer.Idled:Connect(function()
-    vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-    task.wait(1)
-    vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+-- 4. Анти-АФК (щоб не викидало під час роботи фарму)
+player.Idled:Connect(function()
+    game:GetService("VirtualUser"):ClickButton2(Vector2.new(0,0))
 end)
